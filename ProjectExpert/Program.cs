@@ -1,56 +1,155 @@
-﻿using System.Net.NetworkInformation;
-using System.Runtime.CompilerServices;
-while (true)
-{
-    Console.Write(":-: ");
-    string? input = Console.ReadLine();
+﻿using System.Net;
+using System.Net.NetworkInformation;
+using System.Text;
 
-    #region Commands
-    // Check if input is null or empty
-    if (string.IsNullOrEmpty(input)) continue;
-    // Clear Command
-    if (input == "cls" || input == "clear") { Console.Clear(); continue; }
-    // Ping Command
-    if (input.StartsWith("ping"))
+class Program
+{
+    static void Main(string[] args)
     {
-        string helpMsg = "Usage: ping <host> [-t] [-i ttl] [-w timeout]\n" +
-            "-t: Continuous ping\n" +
-            "-i ttl: Set the Time To Live (TTL) value\n" +
-            "-w timeout: Set the timeout in milliseconds";
-        string[] pingArgs = input.Split(' ');
-        if (pingArgs.Length < 2)
+
+        while (true)
         {
-            Console.WriteLine(helpMsg);
-            continue;
+            #region Input Prompt
+            Console.OutputEncoding = Encoding.UTF8;
+            Console.ForegroundColor = ConsoleColor.DarkCyan;
+            Console.Write("▶");
+            Console.ForegroundColor = ConsoleColor.Magenta;
+            Console.Write("> ");
+            Console.ResetColor();
+            string? input = Console.ReadLine();
+            #endregion
+
+            #region Commands Dispatcher
+            // Check if input is null or empty
+            if (string.IsNullOrEmpty(input)) continue;
+
+            // Parse the command and args
+            string[] cmdArgs = input.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (cmdArgs.Length == 0) continue;
+
+            string command = cmdArgs[0].ToLower();
+
+            // Check for command-specific help
+            if (cmdArgs.Length > 1 && cmdArgs[1].ToLower() == "?")
+            {
+                HandleHelpCommand(command);
+                continue;
+            }
+
+            // Dispatch to appropriate command handler
+            switch (command)
+            {
+                case "?":
+                    HandleHelpCommand(cmdArgs.Length > 1 ? cmdArgs[1].ToLower() : null);
+                    break;
+                case "cls":
+                case "clear":
+                    HandleClearCommand();
+                    break;
+                case "ping":
+                    // Skip the command name and process only the arguments
+                    string[] pingArgs = cmdArgs.Length > 1 ?
+                        cmdArgs.Skip(1).ToArray() :
+                        Array.Empty<string>();
+                    HandlePingCommand(pingArgs);
+                    break;
+                default:
+                    Console.WriteLine($"Unknown command: {command}");
+                    Console.WriteLine("Type '?' for a list of commands");
+                    break;
+            }
+            #endregion
+        }
+    }
+
+    #region Command Handlers
+
+    private static void HandleClearCommand()
+    {
+        Console.Clear();
+    }
+
+    private static void HandlePingCommand(string[] args)
+    {
+        #region Ping Command
+
+        if (args.Length < 1)
+        {
+            HandleHelpCommand("ping");
+            return;
         }
 
-        string host = pingArgs[1];
+        string host = args[0];
         bool continuous = false;
+        int count = 4; // Default number of tries
         int ttl = 128; // Default TTL
         int timeout = 5000; // Default timeout in milliseconds
+        int bufferSize = 32; // Default buffer size
         bool isValidInput = true;
 
-        // Check for additional arguments
-        for (int i = 2; i < pingArgs.Length; i++)
+        if (!IsValidHost(host))
         {
-            if (pingArgs[i] == "-t")
+            Console.WriteLine($"Could not resolve host: {host}");
+            return;
+        }
+        static bool IsValidHost(string host)
+        {
+            // First check if the input is a valid IP address
+            if (IPAddress.TryParse(host, out _))
+            {
+                return true;
+            }
+
+            // If it's not a valid IP format, try to resolve it as a hostname
+            try
+            {
+                IPAddress[] addresses = Dns.GetHostAddresses(host);
+                return addresses.Length > 0;
+            }
+            catch (Exception)
+            {
+                // If an exception occurs during resolution, the host is invalid
+                return false;
+            }
+        }
+
+
+        // Check for additional arguments
+        for (int i = 1; i < args.Length; i++)
+        {
+            string arg = args[i].ToLower(); // Convert to lower case for comparison
+
+            if (arg == "-t")
             {
                 continuous = true;
             }
-            else if (pingArgs[i] == "-i" && i + 1 < pingArgs.Length)
+            else if (arg == "-n" && i + 1 < args.Length)
             {
-                if (int.TryParse(pingArgs[i + 1], out int parsedTtl))
+                if (int.TryParse(args[i + 1], out int parsedCount) && parsedCount > 0)
+                {
+                    count = parsedCount;
+                    i++; // Skip the value we just processed
+                }
+                else
+                {
+                    NotValidInput("Invalid count value. Must be a positive number.");
+                }
+            }
+            else if (arg == "-i" && i + 1 < args.Length)
+            {
+                if (int.TryParse(args[i + 1], out int parsedTtl))
                 {
                     ttl = parsedTtl;
                     i++; // Skip the value we just processed
                 }
-                else{
+                else
+                {
                     NotValidInput("Invalid TTL value.");
                 }
             }
-            else if (pingArgs[i] == "-w" && i + 1 < pingArgs.Length)
+            else if (arg == "-w" && i + 1 < args.Length)
             {
-                if (int.TryParse(pingArgs[i + 1], out int parsedTimeout))
+                if (int.TryParse(args[i + 1], out int parsedTimeout))
                 {
                     timeout = parsedTimeout;
                     i++; // Skip the value we just processed
@@ -60,7 +159,24 @@ while (true)
                     NotValidInput("Invalid timeout value.");
                 }
             }
+            else if (arg == "-l" && i + 1 < args.Length)
+            {
+                if (int.TryParse(args[i + 1], out int parsedBufferSize) && parsedBufferSize > 0 && parsedBufferSize <= 65500)
+                {
+                    bufferSize = parsedBufferSize;
+                    i++; // Skip the value we just processed
+                }
+                else
+                {
+                    NotValidInput("Invalid buffer value. Must be between 1 and 65500.");
+                }
+            }
+            else if (arg.StartsWith("-"))
+            {
+                NotValidInput($"Unknown argument: {arg}");
+            }
         }
+
         void NotValidInput(string? str = null)
         {
             if (string.IsNullOrEmpty(str))
@@ -71,13 +187,16 @@ while (true)
             {
                 Console.WriteLine(str);
             }
-            Console.WriteLine(helpMsg);
+            HandleHelpCommand("ping");
             isValidInput = false;
         }
+
         if (isValidInput)
         {
             try
             {
+                Console.WriteLine($"Pinging {host} with {bufferSize} bytes of data:");
+
                 Ping ping = new Ping();
                 PingOptions options = new PingOptions
                 {
@@ -85,64 +204,60 @@ while (true)
                     DontFragment = true
                 };
 
-                // Default payload
-                byte[] buffer = new byte[32];
+                // Create buffer with the specified size and fill with data
+                byte[] buffer = new byte[bufferSize];
+                for (int i = 0; i < buffer.Length; i++)
+                {
+                    buffer[i] = (byte)('a' + (i % 26));
+                }
 
+                int sent = 0;
+                int received = 0;
+                long totalTime = 0;
+                long minTime = long.MaxValue;
+                long maxTime = long.MinValue;
+
+                // If continuous, keep pinging until a key is pressed
+                // Otherwise, ping count times
+                int pingCount = 0;
                 do
                 {
+                    sent++;
                     PingReply reply = ping.Send(host, timeout, buffer, options);
-
 
                     if (reply.Status == IPStatus.Success)
                     {
-                        Console.WriteLine($"Reply from {reply.Address}: time={reply.RoundtripTime}ms TTL={reply.Options.Ttl}");
+                        received++;
+                        totalTime += reply.RoundtripTime;
+                        minTime = Math.Min(minTime, reply.RoundtripTime);
+                        maxTime = Math.Max(maxTime, reply.RoundtripTime);
+
+                        Console.WriteLine($"Reply from {reply.Address}: bytes={buffer.Length} time={reply.RoundtripTime}ms TTL={reply.Options.Ttl}");
                     }
                     else
                     {
-                        Console.WriteLine($"Ping failed: {reply.Status}");
+                        Console.WriteLine($"Request timed out: {reply.Status}");
                     }
 
-                    if (continuous)
-                        Thread.Sleep(1000); // Wait 1 second between pings in continuous mode
+                    if (continuous || pingCount < count - 1)
+                        Thread.Sleep(1000); // Wait 1 second between pings
 
-                } while (continuous); // Continue only if -t flag was specified
-                for (int i = 2; i < pingArgs.Length; i++)
+                    pingCount++;
+
+                } while ((continuous && !Console.KeyAvailable) || (!continuous && pingCount < count));
+
+                // Consume the key if we're in continuous mode and a key was pressed
+                if (continuous && Console.KeyAvailable)
+                    Console.ReadKey(true);
+
+                // Display ping statistics
+                Console.WriteLine("\nPing statistics for " + host + ":");
+                Console.WriteLine($"    Packets: Sent = {sent}, Received = {received}, Lost = {sent - received} ({(sent - received) * 100 / sent}% loss)");
+
+                if (received > 0)
                 {
-                    if (pingArgs[i] == "-t")
-                    {
-                        continuous = true;
-                    }
-                    else if (pingArgs[i] == "-i")
-                    {
-                        if (i + 1 < pingArgs.Length && int.TryParse(pingArgs[i + 1], out int parsedTtl))
-                        {
-                            ttl = parsedTtl;
-                            i++; // Skip the value we just processed
-                        }
-                        else
-                        {
-                            NotValidInput("Invalid or missing TTL value.");
-                            break;
-                        }
-                    }
-                    else if (pingArgs[i] == "-w")
-                    {
-                        if (i + 1 < pingArgs.Length && int.TryParse(pingArgs[i + 1], out int parsedTimeout))
-                        {
-                            timeout = parsedTimeout;
-                            i++; // Skip the value we just processed
-                        }
-                        else
-                        {
-                            NotValidInput("Invalid or missing timeout value.");
-                            break;
-                        }
-                    }
-                    else
-                    {
-                        NotValidInput("Unknown argument.");
-                        break;
-                    }
+                    Console.WriteLine("Approximate round trip times in milli-seconds:");
+                    Console.WriteLine($"    Minimum = {minTime}ms, Maximum = {maxTime}ms, Average = {totalTime / received}ms");
                 }
             }
             catch (Exception ex)
@@ -150,6 +265,51 @@ while (true)
                 Console.WriteLine($"Error: {ex.Message}");
             }
         }
+        #endregion
+    }
+
+    private static void HandleHelpCommand(string? command)
+    {
+        #region Help Command
+        if (string.IsNullOrEmpty(command))
+        {
+            // Display all available commands
+            Console.WriteLine("Available commands:");
+            Console.WriteLine("? - Display this help message");
+            Console.WriteLine("ping - Send ICMP echo request to network hosts (type 'ping ?' for more details)");
+            Console.WriteLine("cls/clear - Clear the console screen");
+            Console.WriteLine("Type '<command> ?' for detailed help on a specific command");
+        }
+        else
+        {
+            // Display help for specific command
+            switch (command.ToLower())
+            {
+                case "ping":
+                    Console.WriteLine("ping - Send ICMP echo request to network hosts");
+                    Console.WriteLine("-t: Continuous ping");
+                    Console.WriteLine("-n count: Number of echo requests to send (default is 4)");
+                    Console.WriteLine("-i ttl: Set the Time To Live (TTL) value");
+                    Console.WriteLine("-w timeout: Set the timeout in milliseconds");
+                    Console.WriteLine("-l size: Set the buffer size in bytes");
+                    Console.WriteLine("Usage: ping <host> [-t] [-n count] [-i ttl] [-w timeout] [-l size]");
+                    break;
+                case "cls":
+                case "clear":
+                    Console.WriteLine("cls/clear - Clear the console screen");
+                    Console.WriteLine("Usage: cls or clear");
+                    break;
+                case "?":
+                    Console.WriteLine("help or ? - Display help information");
+                    Console.WriteLine("Usage:  [command]");
+                    Console.WriteLine("command ? (alternative syntax)");
+                    break;
+                default:
+                    Console.WriteLine($"No help available for '{command}'");
+                    break;
+            }
+        }
+        #endregion
     }
     #endregion
 }
