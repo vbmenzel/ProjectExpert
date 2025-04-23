@@ -1,6 +1,7 @@
-﻿using System.Net;
+using System.Net;
 using System.Net.NetworkInformation;
 using System.Text;
+using System.IO;
 
 class Program
 {
@@ -53,6 +54,12 @@ class Program
                         Array.Empty<string>();
                     HandlePingCommand(pingArgs);
                     break;
+                case "cat":
+                    string[] catArgs = cmdArgs.Length > 1 ?
+                        cmdArgs.Skip(1).ToArray() :
+                        Array.Empty<string>();
+                    HandleCatCommand(catArgs);
+                    break;
                 default:
                     Console.WriteLine($"Unknown command: {command}");
                     Console.WriteLine("Type '?' for a list of commands");
@@ -86,6 +93,8 @@ class Program
         int timeout = 5000; // Default timeout in milliseconds
         int bufferSize = 32; // Default buffer size
         bool isValidInput = true;
+        string? outputFile = null; // Placeholder for output file name
+
 
         if (!IsValidHost(host))
         {
@@ -171,6 +180,44 @@ class Program
                     NotValidInput("Invalid buffer value. Must be between 1 and 65500.");
                 }
             }
+            else if (arg == "|" && i + 1 < args.Length)
+            {
+                // Handle pipe to file
+                outputFile = args[i + 1];
+
+                // Validate the file path
+                try
+                {
+                    // Check if the directory exists (if a path is specified)
+                    string directory = Path.GetDirectoryName(outputFile);
+                    if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+                    {
+                        NotValidInput($"Directory does not exist: {directory}");
+                        break;
+                    }
+
+                    // Add .txt extension if no extension is provided
+                    if (!Path.HasExtension(outputFile))
+                    {
+                        outputFile += ".txt";
+                    }
+
+                    // Try to create/open the file to check if it's writable
+                    using (FileStream fs = File.Create(outputFile))
+                    {
+                        // File is writable, close it immediately
+                    }
+                    // Delete the empty file we just created for testing
+                    File.Delete(outputFile);
+                }
+                catch (Exception ex)
+                {
+                    NotValidInput($"Invalid file path: {ex.Message}");
+                    break;
+                }
+
+                i++; // Skip the filename we just processed
+            }
             else if (arg.StartsWith("-"))
             {
                 NotValidInput($"Unknown argument: {arg}");
@@ -195,7 +242,15 @@ class Program
         {
             try
             {
-                Console.WriteLine($"Pinging {host} with {bufferSize} bytes of data:");
+                // Create a StringBuilder to store output for file writing
+                StringBuilder outputBuilder = new StringBuilder();
+
+                string pingHeader = $"Pinging {host} with {bufferSize} bytes of data:";
+                Console.WriteLine(pingHeader);
+                if (outputFile != null)
+                {
+                    outputBuilder.AppendLine(pingHeader);
+                }
 
                 Ping ping = new Ping();
                 PingOptions options = new PingOptions
@@ -225,6 +280,7 @@ class Program
                     sent++;
                     PingReply reply = ping.Send(host, timeout, buffer, options);
 
+                    string replyMessage;
                     if (reply.Status == IPStatus.Success)
                     {
                         received++;
@@ -232,11 +288,17 @@ class Program
                         minTime = Math.Min(minTime, reply.RoundtripTime);
                         maxTime = Math.Max(maxTime, reply.RoundtripTime);
 
-                        Console.WriteLine($"Reply from {reply.Address}: bytes={buffer.Length} time={reply.RoundtripTime}ms TTL={reply.Options.Ttl}");
+                        replyMessage = $"Reply from {reply.Address}: bytes={buffer.Length} time={reply.RoundtripTime}ms TTL={reply.Options.Ttl}";
                     }
                     else
                     {
-                        Console.WriteLine($"Request timed out: {reply.Status}");
+                        replyMessage = $"Request timed out: {reply.Status}";
+                    }
+
+                    Console.WriteLine(replyMessage);
+                    if (outputFile != null)
+                    {
+                        outputBuilder.AppendLine(replyMessage);
                     }
 
                     if (continuous || pingCount < count - 1)
@@ -251,13 +313,45 @@ class Program
                     Console.ReadKey(true);
 
                 // Display ping statistics
-                Console.WriteLine("\nPing statistics for " + host + ":");
-                Console.WriteLine($"    Packets: Sent = {sent}, Received = {received}, Lost = {sent - received} ({(sent - received) * 100 / sent}% loss)");
+                string statsHeader = $"\nPing statistics for {host}:";
+                string packetStats = $"    Packets: Sent = {sent}, Received = {received}, Lost = {sent - received} ({(sent - received) * 100 / sent}% loss)";
+
+                Console.WriteLine(statsHeader);
+                Console.WriteLine(packetStats);
+
+                if (outputFile != null)
+                {
+                    outputBuilder.AppendLine(statsHeader);
+                    outputBuilder.AppendLine(packetStats);
+                }
 
                 if (received > 0)
                 {
-                    Console.WriteLine("Approximate round trip times in milli-seconds:");
-                    Console.WriteLine($"    Minimum = {minTime}ms, Maximum = {maxTime}ms, Average = {totalTime / received}ms");
+                    string timesHeader = "Approximate round trip times in milli-seconds:";
+                    string timesStats = $"    Minimum = {minTime}ms, Maximum = {maxTime}ms, Average = {totalTime / received}ms";
+
+                    Console.WriteLine(timesHeader);
+                    Console.WriteLine(timesStats);
+
+                    if (outputFile != null)
+                    {
+                        outputBuilder.AppendLine(timesHeader);
+                        outputBuilder.AppendLine(timesStats);
+                    }
+                }
+
+                // Write to file if piping was requested
+                if (outputFile != null)
+                {
+                    try
+                    {
+                        File.WriteAllText(outputFile, outputBuilder.ToString());
+                        Console.WriteLine($"\nOutput saved to {Path.GetFullPath(outputFile)}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error writing to file: {ex.Message}");
+                    }
                 }
             }
             catch (Exception ex)
@@ -266,6 +360,49 @@ class Program
             }
         }
         #endregion
+    }
+
+    private static void HandleCatCommand(string[] args)
+    {
+        if (args.Length == 0)
+        {
+            HandleHelpCommand("cat");
+            return;
+        }
+
+        foreach (string filePath in args)
+        {
+            if (File.Exists(filePath))
+            {
+                try
+                {
+                    string content = File.ReadAllText(filePath);
+                    Console.WriteLine($"Contents of {filePath}:");
+                    Console.WriteLine(content);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error reading file '{filePath}': {ex.Message}");
+                }
+            }
+            else if (File.Exists(filePath + ".txt"))
+            {
+                try
+                {
+                    string content = File.ReadAllText(filePath + ".txt");
+                    Console.WriteLine($"Contents of {filePath + ".txt"}:");
+                    Console.WriteLine(content);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error reading file '{filePath + ".txt"}': {ex.Message}");
+                }
+            }
+            else
+            {
+                Console.WriteLine($"File not found: {filePath}");
+            }
+        }
     }
 
     private static void HandleHelpCommand(string? command)
@@ -277,6 +414,7 @@ class Program
             Console.WriteLine("Available commands:");
             Console.WriteLine("? - Display this help message");
             Console.WriteLine("ping - Send ICMP echo request to network hosts (type 'ping ?' for more details)");
+            Console.WriteLine("cat - Display the contents of a file (type 'cat ?' for more details)");
             Console.WriteLine("cls/clear - Clear the console screen");
             Console.WriteLine("Type '<command> ?' for detailed help on a specific command");
         }
@@ -292,12 +430,17 @@ class Program
                     Console.WriteLine("-i ttl: Set the Time To Live (TTL) value");
                     Console.WriteLine("-w timeout: Set the timeout in milliseconds");
                     Console.WriteLine("-l size: Set the buffer size in bytes");
-                    Console.WriteLine("Usage: ping <host> [-t] [-n count] [-i ttl] [-w timeout] [-l size]");
+                    Console.WriteLine("| filename: Pipe output to a file (adds .txt extension if none provided)");
+                    Console.WriteLine("Usage: ping <host> [-t] [-n count] [-i ttl] [-w timeout] [-l size] [| filename]");
                     break;
                 case "cls":
                 case "clear":
                     Console.WriteLine("cls/clear - Clear the console screen");
                     Console.WriteLine("Usage: cls or clear");
+                    break;
+                case "cat":
+                    Console.WriteLine("cat - Display the contents of a file");
+                    Console.WriteLine("Usage: cat <filename>");
                     break;
                 case "?":
                     Console.WriteLine("help or ? - Display help information");
