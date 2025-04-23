@@ -441,6 +441,8 @@ class Program
                     Console.WriteLine("cls/clear - Clear the console screen");
                     Console.WriteLine("Usage: cls or clear");
                     break;
+                case "concatonate":
+                case "concat":
                 case "cat":
                     Console.WriteLine("cat - Display the contents of a file");
                     Console.WriteLine("Usage: cat <filename>");
