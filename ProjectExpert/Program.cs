@@ -40,6 +40,9 @@ class Program
             // Dispatch to appropriate command handler
             switch (command)
             {
+                case "help":
+                case "command":
+                case "commands":
                 case "?":
                     HandleHelpCommand(cmdArgs.Length > 1 ? cmdArgs[1].ToLower() : null);
                     break;
