@@ -78,7 +78,7 @@ class Program
             HandleHelpCommand("ping");
             return;
         }
-
+        if (args[0] == "localhost" ||  args[0] == "local") { args[0] = "127.0.0.1"; }
         string host = args[0];
         bool continuous = false;
         int count = 4; // Default number of tries
