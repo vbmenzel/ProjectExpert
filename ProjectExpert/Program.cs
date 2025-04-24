@@ -2,12 +2,13 @@ using System.Net;
 using System.Net.NetworkInformation;
 using System.Text;
 using System.IO;
+using System.Drawing;
 
 class Program
 {
+    static ConsoleColor errorColor = ConsoleColor.Red;
     static void Main(string[] args)
     {
-
         while (true)
         {
             #region Input Prompt
@@ -101,7 +102,9 @@ class Program
 
         if (!IsValidHost(host))
         {
+            Console.ForegroundColor = errorColor;
             Console.WriteLine($"Could not resolve host: {host}");
+            Console.ResetColor();
             return;
         }
         static bool IsValidHost(string host)
@@ -192,7 +195,7 @@ class Program
                 try
                 {
                     // Check if the directory exists (if a path is specified)
-                    string directory = Path.GetDirectoryName(outputFile);
+                    string? directory = Path.GetDirectoryName(outputFile);
                     if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
                     {
                         NotValidInput($"Directory does not exist: {directory}");
@@ -229,6 +232,7 @@ class Program
 
         void NotValidInput(string? str = null)
         {
+            Console.ForegroundColor = errorColor;
             if (string.IsNullOrEmpty(str))
             {
                 Console.WriteLine("Invalid input. Please check the command and try again.");
@@ -237,6 +241,7 @@ class Program
             {
                 Console.WriteLine(str);
             }
+            Console.ResetColor();
             HandleHelpCommand("ping");
             isValidInput = false;
         }
@@ -353,13 +358,17 @@ class Program
                     }
                     catch (Exception ex)
                     {
+                        Console.ForegroundColor = errorColor;
                         Console.WriteLine($"Error writing to file: {ex.Message}");
+                        Console.ResetColor();
                     }
                 }
             }
             catch (Exception ex)
             {
+                Console.ForegroundColor = errorColor;
                 Console.WriteLine($"Error: {ex.Message}");
+                Console.ResetColor();
             }
         }
         #endregion
@@ -380,12 +389,16 @@ class Program
                 try
                 {
                     string content = File.ReadAllText(filePath);
+                    Console.ForegroundColor = ConsoleColor.Green;
                     Console.WriteLine($"Contents of {filePath}:");
+                    Console.ResetColor();
                     Console.WriteLine(content);
                 }
                 catch (Exception ex)
                 {
+                    Console.ForegroundColor = errorColor;
                     Console.WriteLine($"Error reading file '{filePath}': {ex.Message}");
+                    Console.ResetColor();
                 }
             }
             else if (File.Exists(filePath + ".txt"))
@@ -393,17 +406,23 @@ class Program
                 try
                 {
                     string content = File.ReadAllText(filePath + ".txt");
+                    Console.ForegroundColor = ConsoleColor.Green;
                     Console.WriteLine($"Contents of {filePath + ".txt"}:");
+                    Console.ResetColor();
                     Console.WriteLine(content);
                 }
                 catch (Exception ex)
                 {
+                    Console.ForegroundColor = errorColor;
                     Console.WriteLine($"Error reading file '{filePath + ".txt"}': {ex.Message}");
+                    Console.ResetColor();
                 }
             }
             else
             {
+                Console.ForegroundColor = errorColor;
                 Console.WriteLine($"File not found: {filePath}");
+                Console.ResetColor();
             }
         }
     }
