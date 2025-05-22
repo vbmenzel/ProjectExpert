@@ -1,9 +1,6 @@
-using System;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Text;
-using System.IO;
-using System.Threading;
 
 /// <summary>
 /// A simple command-line shell that provides basic networking and file system utilities.
