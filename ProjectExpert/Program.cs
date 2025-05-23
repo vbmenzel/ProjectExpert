@@ -24,9 +24,7 @@ class Program
     #region Main Entry Point
     /// <summary>
     /// Main application entry point. Sets up the command loop and handles user input.
-    /// Registers Ctrl+C handler for graceful interruption of operations.
     /// </summary>
-    /// <param name="args">Command line arguments (currently unused)</param>
     static void Main(string[] args)
     {
         // Set up graceful Ctrl+C handling to prevent abrupt termination
