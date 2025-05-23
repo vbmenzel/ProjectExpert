@@ -61,7 +61,7 @@ class Program
 
             // Split input into command and arguments, removing empty entries
             // This handles multiple spaces between arguments gracefully
-            string[] cmdArgs = input!.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            string[] cmdArgs = SplitCommandLine(input!);
             if (cmdArgs.Length == 0) continue;
 
             // Extract the main command (case-insensitive)
@@ -156,7 +156,7 @@ class Program
     private static void HandleDirCommand(string[] args)
     {
         // Use current directory if no path is specified
-        string path = args.Length > 0 ? args[0] : Directory.GetCurrentDirectory();
+        string path = args.Length > 0 ? args[0].Trim('"') : Directory.GetCurrentDirectory();
 
         // Validate that the specified directory exists
         if (!Directory.Exists(path))
@@ -192,6 +192,7 @@ class Program
     /// <summary>
     /// Handles the 'cat' command to display file contents.
     /// Can display multiple files in sequence and automatically tries .txt extension if file not found.
+    /// Now supports quoted filenames with spaces.
     /// </summary>
     /// <param name="args">Array of file paths to display</param>
     private static void HandleCatCommand(string[] args)
@@ -204,8 +205,11 @@ class Program
         }
 
         // Process each file specified in the arguments
-        foreach (string filePath in args)
+        foreach (string rawFilePath in args)
         {
+            // Remove surrounding quotes if present
+            string filePath = rawFilePath.Trim('"');
+
             // Try to read the file as specified
             if (File.Exists(filePath))
             {
@@ -261,7 +265,47 @@ class Program
             }
         }
     }
+
     #endregion
+    /// <summary>
+    /// Splits a command line string into arguments, respecting quoted substrings.
+    /// </summary>
+    private static string[] SplitCommandLine(string input)
+    {
+        var args = new List<string>();
+        var current = new StringBuilder();
+        bool inQuotes = false;
+
+        for (int i = 0; i < input.Length; i++)
+        {
+            char c = input[i];
+
+            if (c == '"')
+            {
+                inQuotes = !inQuotes;
+                continue;
+            }
+
+            if (char.IsWhiteSpace(c) && !inQuotes)
+            {
+                if (current.Length > 0)
+                {
+                    args.Add(current.ToString());
+                    current.Clear();
+                }
+            }
+            else
+            {
+                current.Append(c);
+            }
+        }
+
+        if (current.Length > 0)
+            args.Add(current.ToString());
+
+        return args.ToArray();
+    }
+
 
     #region Network Commands
     /// <summary>
@@ -648,6 +692,8 @@ class Program
                     Console.WriteLine("Usage: cls or clear");
                     break;
 
+                case "load":
+                case "read":
                 case "cat":
                     Console.WriteLine("cat - Display the contents of a file");
                     Console.WriteLine("Automatically tries .txt extension if file not found");
