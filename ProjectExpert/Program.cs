@@ -35,6 +35,27 @@ class Program
             e.Cancel = true; // Prevents immediate program termination
         };
 
+        // Welcome message: guides new users to 'help', 'exit', and 'quit' commands
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.Write("Welcome to our ping CLI program! Type '");
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.Write("help");
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.Write("' for a list of commands.\n");
+        Console.Write("Type '");
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.Write("exit");
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.Write("' or '");
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        Console.Write("quit");
+        Console.ForegroundColor = ConsoleColor.Cyan;
+        Console.Write("' to leave the shell.\n");
+        // Set the console title for a better user experience
+        Console.Title = "Ping - CLI";
+
+        Console.ResetColor(); // Reset console colors to default
+
         // Main command processing loop - continues until user exits
         while (true)
         {
